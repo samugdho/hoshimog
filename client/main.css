@@ -1,0 +1,85 @@
+body {
+	overflow	: hidden;
+	padding		: 0;
+	margin		: 0;
+
+	color		: #222;
+	background-color: #000;
+	font-family	: arial;
+	font-size	: 100%;
+}
+#info .top {
+	position	: absolute;
+	top		: 0px;
+	width		: 100%;
+	padding		: 5px;
+	text-align	: center;
+}
+#info a {
+	color		: #66F;
+	text-decoration	: none;
+}
+#info a:hover {
+	text-decoration	: underline;
+}
+#info .bottom {
+	position	: absolute;
+	bottom		: 0px;
+	right		: 5px;
+	padding		: 5px;
+}
+/*#canvas {
+	cursor : none;
+	top : 0px;
+	left : 0px;
+}*/
+
+
+#chat-text {
+	color : white;
+	width : 500px;
+	height : 100px;
+	overflow-y : auto;
+	overflow-x : hidden;
+	
+}
+
+
+#chat-input {
+	width : 500px;
+	height : 20px;
+}
+
+#chat-items {
+	opacity : 0.4;
+	position : fixed;
+	bottom : 5px;
+	left : 5px;
+}
+#password {
+	position : fixed;
+	top : 100px;
+	left : 100px;
+}
+#pass-status {
+	color : white;
+}
+#chat-items:hover {
+	opacity : 0.9;
+}
+
+::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.5);
+	-webkit-border-color : #000;
+    -webkit-border-radius: 2px;
+}
+
+::-webkit-scrollbar-corner {
+    background: #000;
+}

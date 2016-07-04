@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+	<head>
+		<title>MOG</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<script src="/client/Detector.js"></script>
+		
+		<script type="text/javascript" src= "https://cdnjs.cloudflare.com/ajax/libs/three.js/r78/three.min.js"></script>
+		<script type="text/javascript" src= "https://rawgit.com/mrdoob/three.js/master/examples/js/controls/DeviceOrientationControls.js"></script>
+		
+		<script type="text/javascript" src= "https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.4.4/randomColor.min.js"></script>
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.4.8/socket.io.min.js"></script>
+		<script src="/client/game.js"></script>
+		<link  href="/client/main.css" rel="stylesheet"/>
+		
+	</head>
+<body>
+	<!-- three.js container -->
+	<div id = 'password'>
+		<H1 id = 'pass-status'>PASSWORD</H1><H1 ></H1>
+		<form id = 'pass-form' autocomplete = 'off'>
+		
+			<input id = "pass-input" type = "password" value = 'shrek'></input>
+			
+		</form>
+	</div>
+	<div id = "chat-items">
+		<div id = "chat-text" >
+			<div id = 'player-count'>player count : 0</div>
+		
+		</div>
+		<form id = 'chat-form' autocomplete = 'off'>
+		
+			<input id = "chat-input" type = "text">
+			</input>
+			
+		</form>
+	</div>
+	
+	
+    <div id="container"></div>
+	<canvas id = 'canvas'></canvas>
+	<div id="info">
+	</div>
+	
+	<script>
+		document.addEventListener('DOMContentLoaded', game.start );
+		//game.start();
+	</script>
+</body>
+</html>
