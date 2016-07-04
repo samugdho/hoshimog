@@ -87,7 +87,7 @@ function init(){
 	);
 	HUD.setPosition(HUD.cursor, 0.5, 0.5);
 	HUD.scene.add(HUD.cursor);	
-	
+	HUD.cursor.visible = false;
 	
 	//password
 	passInput = document.getElementById('pass-input').focus();
