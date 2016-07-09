@@ -7,8 +7,8 @@
 game = {};
 game.start = function(){
 	
-var stats, scene, renderer, caster, camera, mouse, canvas, socket, userId, FPS = 60, gravity = 0.1, HUD = {},
-	serverFPS, player, chatText, chatInput, hex, controls, laser = {}, relMouse, isMouseLock = false, phoneControls,
+var stats, scene, renderer, caster, camera, mouse, canvas, socket, userId, FPS = 60, gravity = 0.1, HUD = {}, world = { globe : null, radius : 500},playerRot,
+	serverFPS, player, chatText, chatInput, hex, controls, laser = {}, relMouse, isMouseLock = false, phoneControls, DPS, attackTarget,
 	box, camdist, clientUpdate, jump, testLight, sideLights, isPhoneControl = false,
 	buttons = [], PLAYERS_LIST = {}, floor, playerStats = {}
 	isUpdate = false, isPause = false, gameover = false, isFocus = true,
@@ -20,12 +20,41 @@ function init(){
 	socket = io();
 	//setting
 	
+	
+	
 	mouse = new THREE.Vector2(0,0);
+	mouse.isDown = false;
 	relMouse = new THREE.Vector2(0,0);
 	caster = new THREE.Raycaster();
 	
 	scene = new THREE.Scene();
-
+	//var mapHeight = new THREE.TextureLoader().load( "client/bumps2.png" );
+	var globeMaterial = new THREE.MeshPhongMaterial({color : 0x777777, emissive : 0x777777, emissiveIntensity : 0.1,/*wireframe : true, /*bumpMap : mapHeight ,displacementMap : mapHeight, displacementScale : 5*/ });
+	world.globe = new THREE.Mesh(
+		new THREE.SphereGeometry(world.radius,64,64),
+		globeMaterial
+	);
+	scene.add(world.globe);
+	
+	
+	var sun = new THREE.Mesh(
+		new THREE.SphereGeometry(50,8,8),
+		new THREE.MeshBasicMaterial({color : 0xffffcc})
+	);
+	scene.add(sun);
+	sun.position.set(1000,1000,1000);
+	
+	var directionalLight = new THREE.DirectionalLight( 0xffffff, 1.5 );
+	directionalLight.position.set( 600, 600,600 );
+	scene.add( directionalLight );
+	var dblue = new THREE.DirectionalLight( 0xffffff, 0.2 );
+	dblue.position.set( -600, -600, -600 );
+	scene.add( dblue );
+	
+	
+	
+	
+	
 	width = window.innerWidth, height = window.innerHeight;
 	canvas = document.getElementById('canvas');
 	if( Detector.webgl ){
@@ -37,9 +66,11 @@ function init(){
 		Detector.addGetWebGLMessage();
 		return true;
 	}
+	
 	renderer.setSize( width, height );
 	renderer.autoClear = false;
-	renderer.setClearColor(0xcccccc);
+	renderer.setClearColor(0xaaaaaa);
+	renderer.shadowMap.enabled = true;
 	document.getElementById('container').appendChild(renderer.domElement);
 	
 	jump = {power : {now : 0, max : 0.5, add: 0.01}, build : false, ready : true};
@@ -80,6 +111,16 @@ function init(){
 	HUD.healthBar.visible = false;
 	HUD.setPosition(HUD.healthBar, 0.5, 0.05);
 	HUD.scene.add(HUD.healthBar);
+	HUD.northBar = new THREE.Object3D();
+	HUD.northBlock = new THREE.Mesh(
+		new THREE.BoxGeometry(10,100,10),
+		new THREE.MeshLambertMaterial({color : 0xee0000, emissive: 0xee0000})
+	);
+	HUD.northBlock.position.z -= 5;
+	HUD.scene.add(HUD.northBlock);
+	//HUD.scene.add(HUD.northBar);
+	
+	
 	
 	HUD.cursor = new THREE.Mesh(
 		new THREE.PlaneGeometry(10,10),
@@ -87,7 +128,7 @@ function init(){
 	);
 	HUD.setPosition(HUD.cursor, 0.5, 0.5);
 	HUD.scene.add(HUD.cursor);	
-	HUD.cursor.visible = false;
+	//HUD.cursor.visible = false;
 	
 	//password
 	passInput = document.getElementById('pass-input').focus();
@@ -104,12 +145,16 @@ function init(){
 	canvas.addEventListener('mouseleave', mouseleavehandle);
 	canvas.addEventListener('mouseenter', mouseenterhandle);
 	window.addEventListener('dblclick', dblclickhandle);
+	canvas.addEventListener('mousemove', mousemovehandle);
+	
 	document.addEventListener('pointerlockchange', lockmousechangehandle, false);
 	document.addEventListener('mozpointerlockchange', lockmousechangehandle, false);
 	document.addEventListener('webkitpointerlockchange', lockmousechangehandle, false);
 	document.addEventListener( 'pointerlockerror', pointerlockerror, false );
 	document.addEventListener( 'mozpointerlockerror', pointerlockerror, false );
 	document.addEventListener( 'webkitpointerlockerror', pointerlockerror, false );
+	
+	
 	chatForm.onsubmit = function(e){
 		e.preventDefault();
 		if (chatInput.value){
@@ -131,6 +176,14 @@ function init(){
 		//batch creation
 	
 		//single creation
+	var nSphere = new THREE.Mesh(
+		new THREE.BoxGeometry(15,10005,15),
+		new THREE.MeshLambertMaterial({color : 0x770000, emissive : 0x777777, emissiveIntensity : 0.5, transparent : true, opacity : 1})
+	);
+	nSphere.position.set(0,4501,0);
+	scene.add(nSphere);	
+		
+		
 	var grid = new THREE.GridHelper(10, .5);
 	
 	
@@ -142,7 +195,7 @@ function init(){
 	
 	//stats
 	playerStats.hp = {now : 100, max : 100};
-	
+	playerStats.turn = {now : 0, to : 0};
 	//weapon
 	laser.object = new THREE.Object3D()
 	laser.beam = new THREE.Mesh(
@@ -156,21 +209,20 @@ function init(){
 	
 	//scene.add(laser.object);
 	
-	floor = new THREE.Mesh(new THREE.PlaneGeometry(20,20), new THREE.MeshPhongMaterial({color : 0x111111})).rotateX(-Math.PI/2);
-	scene.add(floor);
+	
 	
 		//filming
 	camera.up = new THREE.Vector3(0,1,0);
 	camera.lookAt(new THREE.Vector3(0, 0, 0));
 	//camdist = box.position.clone().sub(camera.position);
 		//lighting
-	var ambientlLight = new THREE.AmbientLight(0xffffff, 0.2);
+	var ambientlLight = new THREE.AmbientLight(0xffffff, 0.1);
 	scene.add(ambientlLight);
 	
-	var pointLightPositions = [[-10,10,-10],
+	/* var pointLightPositions = [[-10,10,-10],
 							   [10, 10, -10], [-10, 10, 10],
-							   [10,10,10]];
-	sideLights = new THREE.Object3D();
+							   [10,10,10]]; */
+	/* sideLights = new THREE.Object3D();
 	for (var i = 0; i < pointLightPositions.length; i++){
 		var pointLight = new THREE.PointLight(0xffffff, 1.5, 30);
 		pointLight.position.set(pointLightPositions[i][0],
@@ -179,7 +231,7 @@ function init(){
 		
 		sideLights.add(pointLight);
 	}
-	scene.add(sideLights);
+	scene.add(sideLights); */
 	
 	
 	//THIS is for use later if needed//
@@ -197,7 +249,9 @@ function init(){
 			userId = playerinit.id;
 			serverFPS = playerinit.fps;
 			createPlayer(playerinit);
-			player = PLAYERS_LIST[userId];
+			playerRot = PLAYERS_LIST[userId];
+			playerRot.rotation.set(Math.random(),Math.random(),Math.random());
+			player = playerRot.children[0];
 			player.add(camera);
 			player.add(laser.object);
 			hex = player.material.color.getHex();
@@ -213,7 +267,7 @@ function init(){
 			// JUST LOCK MY SHIT UP FAM
 			//pointerLock();
 			
-			canvas.addEventListener('mousemove', mousemovehandle);
+			
 		
 			socket.on('recieveDamage', recieveDamage);
 			socket.on('serverInfo', handlePlayerInfo);
@@ -249,11 +303,7 @@ function clearChat(option){
 }
 function getClientUpdateData(){
 	return { 
-		position : { 
-			x : player.position.x,
-			y : player.position.y,
-			z : player.position.z 
-		},
+		rotation : playerRot.quaternion.toArray(),
 		hex : hex
 	}
 }
@@ -272,10 +322,8 @@ function handlePlayerInfo(PLAYERS_LISTdata){
 			createPlayer(p);
 		}
 		if (p.id != userId){
-			PLAYERS_LIST[i].position.set(p.position.x, 
-										p.position.y, 
-										p.position.z);
-			PLAYERS_LIST[i].material.color.setHex(p.hex);
+			PLAYERS_LIST[i].quaternion.fromArray(p.rotation);
+			PLAYERS_LIST[i].children[0].material.color.setHex(p.hex);
 		}
 			
 	}
@@ -285,6 +333,22 @@ function handlePlayerInfo(PLAYERS_LISTdata){
 }
 
 //changers
+
+HUD.pointNorth = function(){
+	var position = player.getWorldPosition(),
+		normal = position.negate().normalize(),
+		constant = - position.length(),
+		plane = new THREE.Plane(normal, constant),
+		np = plane.projectPoint(new THREE.Vector3(0,500,0)).setLength(5),
+		npwp = player.worldToLocal( np.add( player.getWorldPosition() ) ) ;
+		npwp.y = HUD.top - 150;
+		npwp.x *= -HUD.left/5;
+		npwp.z -= 5;
+		HUD.northBlock.position.copy( npwp ) ;
+
+}
+
+
 HUD.setPosition = function(obj, x,y,z){
 	var xx = x || 0.5,
 		yy = y || 0.5,
@@ -303,9 +367,11 @@ function togglePointerLock(){
 	var havePointerLock = 	'pointerLockElement' in document ||
 							'mozPointerLockElement' in document ||
 							'webkitPointerLockElement' in document;
+	
 	if (havePointerLock){
 		if(!isMouseLock){
 			isMouseLock = true;
+			HUD.setPosition(HUD.cursor, 0.5, 0.5);
 			var element = document.body;
 			element.requestPointerLock = element.requestPointerLock ||
 											 element.mozRequestPointerLock ||
@@ -324,35 +390,7 @@ function togglePointerLock(){
 	
 }
 
-function pointerLock(){
-	var havePointerLock = 	'pointerLockElement' in document ||
-							'mozPointerLockElement' in document ||
-							'webkitPointerLockElement' in document;
-	if (havePointerLock){
-		
-		canvas.addEventListener('click', mouseclicklock);
-		//canvas.click();
-		//canvas.addEventListener('mousemove', mousemovehandle);
-		
-		
-	}else{
-		canvas.addEventListener('mousemove', mousemovehandle);
-		
-		socket.on('recieveDamage', recieveDamage);
-		socket.on('serverInfo', handlePlayerInfo);
-		socket.on('deleteinfo', deletePlayer);
-		socket.on('clearChat', clearChat);
-		socket.on('addToChat', function(data){
-				chatText.innerHTML += '<div>' + data.words + '</div>';
-				chatText.lastChild.scrollIntoView();
-		});
-		
-		isUpdate = true;
-		isFocus = true;
-		
-		socket.emit('mouseLockCheck', null);
-	}
-}
+
 
 
 function wasted(){
@@ -366,26 +404,40 @@ function wasted(){
 	
 }
 
-function recieveDamage(data){
-	var weaponDamage = data.weaponDamage || 0;
-	playerStats.hp.now = clamp(playerStats.hp.now - data.weaponDamage, 0.001, playerStats.hp.max);
-	HUD.healthBar.scale.x = playerStats.hp.now/playerStats.hp.max;
-	if (playerStats.hp.now < 0.002){
-		wasted();
+function updateDamage(){
+	if(DPS > 0){
+		playerStats.hp.now = clamp(playerStats.hp.now - DPS/60 , 0.001, playerStats.hp.max);
+		HUD.healthBar.scale.x = playerStats.hp.now/playerStats.hp.max;
+		if (playerStats.hp.now < 0.002){
+			wasted();
+		}
 	}
+	
+}
+
+function recieveDamage(data){
+	DPS += data.DPS;
+	
+	
 }
 function updatePlayerCount(){
 	var count  = Object.keys(PLAYERS_LIST).length;
 	document.getElementById('player-count').innerHTML = 'player count: '+count;
 }
+
+
+
 function look(){
-	player.rotation.y = transition(player.rotation.y, -Math.PI * mouse.x);
+	playerStats.turn.to = -Math.PI * mouse.x;
+	var tempNow = playerStats.turn.now;
+	playerStats.turn.now = transition(playerStats.turn.now, playerStats.turn.to);
+	playerRot.rotateY(playerStats.turn.now - tempNow);
 	camera.rotation.x = transition(camera.rotation.x, Math.PI/2 * mouse.y/6 - 0.5);
 }
 function lockLook(){
-	var speed = 100;
-	player.rotation.y = transition(player.rotation.y, player.rotation.y - relMouse.x/ speed );
-	camera.rotation.x = clamp(camera.rotation.x - relMouse.y / (speed*10), -Math.PI/5, -Math.PI/10) ;
+	var amt = 150;
+	playerRot.rotateY( - relMouse.x/ amt );
+	camera.rotation.x = clamp(camera.rotation.x - relMouse.y / (amt*10), -Math.PI/5, Math.PI/2) ;
 }
 
 
@@ -405,18 +457,24 @@ function transition(now, after, options){
 function createPlayer(p){
 	var boxGeom	= new THREE.BoxGeometry( 1,1,1 );
 	var boxMat = new THREE.MeshLambertMaterial( { color: p.hex || randomColor({ hue : 'random',  luminosity : 'bright'}) } );
+	var oPlayer = new THREE.Object3D();
 	var obox = new THREE.Mesh(boxGeom, boxMat );
+	obox.position.y = world.radius + 0.5;
+	
+	//oPlayer.quaternion.fromArray(p.rotation);
+	
 	obox.socketId = p.id;
-	obox.position.set(p.position.x, p.position.y, p.position.z);
-	PLAYERS_LIST[p.id] = obox;
+	PLAYERS_LIST[p.id] = oPlayer;
 	console.log(p.id, 'connected');
 	updatePlayerCount();
-	scene.add(obox);
+	oPlayer.add(obox);
+	scene.add(oPlayer);
+	
 }
 function getArray(listObj){
 	var arr = new Array();
 	for (var i in listObj){
-		arr.push(listObj[i]);
+		arr.push(listObj[i].children[0]);
 	}
 	return arr;
 }
@@ -454,20 +512,17 @@ function jumper(keydown){
 
 function playerMove(amt){
 	if (keyState[keys.w]){
-		player.translateZ(-amt);
-	}if (keyState[keys.s]){
-		player.translateZ(amt);
-	}if (keyState[keys.a]){
-		player.translateX(-amt);
-	}if (keyState[keys.d]){
-		player.translateX(amt);
+		playerRot.rotateX(-amt);
+	}else if (keyState[keys.s]){
+		playerRot.rotateX(amt);
+	}
+	if (keyState[keys.a]){
+		playerRot.rotateZ(amt);
+	}else if (keyState[keys.d]){
+		playerRot.rotateZ(-amt);
 	}
 }
-function updateCamera(){
-	camera.position.set(player.position.x ,
-						player.position.y + 5,
-						player.position.z + 5);
-}
+
 	//clamps
 function playerClamp(){
 	player.position.x = clamp(player.position.x, -10, 10);
@@ -499,6 +554,8 @@ function lockmousemovehandle(e){
 			  0;
 	lockLook();
 	
+	mouseMoveInAttack();
+	
 	
 }
 function keyuphandle(e){
@@ -510,17 +567,21 @@ function keydownhandle(e){
 		togglePointerLock();
 	}
 	
+	
 }
 function lockmousechangehandle(){
+	if(!keyState[keys.l]){
+		isMouseLock = false;
+	}
 	if (isMouseLock){
-		console.log('mouse is locked'); //kind of counterintuitive see: mouseclicklock()
-		
+		console.log('mouse is locked'); 
 		
 		//window.addEventListener('click', mouseclickhandle);
 		document.addEventListener('mousemove', lockmousemovehandle);
 		document.addEventListener('mousedown', mousedownhandle);
 		document.addEventListener('mouseup', mouseuphandle);
 	}else{
+		
 		console.log('mouse is not locked');
 		isMouseLock = false;
 		document.removeEventListener('mousemove', lockmousemovehandle);
@@ -532,9 +593,46 @@ function lockmousechangehandle(){
 }
 function mousemovehandle(e){
 	//normalize mouse
+	
 	mouse.x = (e.clientX / width) * 2 -1;
-    mouse.y = -(e.clientY / height) * 2 + 1;	
+    mouse.y = -(e.clientY / height) * 2 + 1;
+	
+	mouseMoveInAttack();
+
 }
+
+
+function mouseMoveInAttack(){
+	if (mouse.isDown){
+		var v = isMouseLock ? new THREE.Vector2(0,0) : new THREE.Vector2(0,mouse.y);
+		caster.setFromCamera(v , camera);
+		var collisions = caster.intersectObjects(getArray(PLAYERS_LIST));
+		if (collisions.length > 0 ){
+			laser.beam.visible = true;
+			player.worldToLocal(collisions[0].point);
+			laser.object.scale.z = collisions[0].point.length();
+			laser.object.lookAt(collisions[0].point);
+			if (!attackTarget){
+				socket.emit('attack', {id : collisions[0].object.socketId, DPS : 10});
+				attackTarget = collisions[0].object.socketId;
+			} else if (attackTarget != collisions[0].object.socketId){
+				socket.emit('attack', {id : collisions[0].object.socketId, DPS : 10});
+				socket.emit('attack', {id : attackTarget, DPS : -10});
+				attackTarget = collisions[0].object.socketId;
+			}
+			
+			//lookAt_byParent(laser.object, player, collisions[0].point);
+		}else{
+			if (attackTarget){
+				socket.emit('attack', {id : attackTarget, DPS : -10});
+				attackTarget = null;
+			}
+		}
+	}
+	
+}
+
+
 function mouseleavehandle(e){}
 function mouseenterhandle(e){}
 function dblclickhandle(e){
@@ -566,6 +664,7 @@ function windowresizehandle(){
 	
 }	
 function mousedownhandle(e){
+	mouse.isDown = true;
 	if (isFocus){
 		//laser.object.lookAt()
 		var v = isMouseLock ? new THREE.Vector2(0,0) : new THREE.Vector2(0,mouse.y);
@@ -579,15 +678,22 @@ function mousedownhandle(e){
 			player.worldToLocal(collisions[0].point);
 			laser.object.scale.z = collisions[0].point.length();
 			laser.object.lookAt(collisions[0].point);
-			socket.emit('doDamage', {id : collisions[0].object.socketId});
+			socket.emit('attack', {id : collisions[0].object.socketId, DPS : 10});
+			attackTarget = collisions[0].object.socketId;
 			//lookAt_byParent(laser.object, player, collisions[0].point);
 		}
 		
 	}
 }
 function mouseuphandle(e){
+	mouse.isDown = true;
 	if (isFocus){
 		laser.beam.visible = false;
+		if (attackTarget){
+			socket.emit('attack', {id : attackTarget, DPS : -10});
+			attackTarget = null;
+		}
+		
 		
 	}
 }
@@ -597,18 +703,24 @@ function mouseuphandle(e){
 
 function update() {
 	if (isFocus){
-		playerMove(0.1);
-		playerClamp();
+		playerMove(0.001);
+		
+		//playerClamp();
 		if (!isMouseLock && !isPhoneControl) {
 			look();
+			HUD.updateCursor();
 		}
 		if (isPhoneControl){
-			phoneControls.update();
+			//phoneControls.update();
 		}
-		HUD.updateCursor();
+		
+		HUD.pointNorth();
 		
 	}
-	jumper(keyState[keys.space]);
+	updateDamage();
+	//console.log(playerRot.quaternion);
+	//jumper(keyState[keys.space]);
+	//console.log(playerRot.quaternion);
 	
 	//UI.objects.healthBar.rotateX(0.05);
 	//updateCamera();

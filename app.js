@@ -42,12 +42,13 @@ io.sockets.on('connection', function(socket){
 					}	
 				});
 				socket.on('clientInfo', function(client){
-					PLAYER_LIST[socket.id].position = client.position;
+					PLAYER_LIST[socket.id].rotation = client.rotation;
 					PLAYER_LIST[socket.id].hex = client.hex;
 				}); 
-				socket.on('doDamage', function(data){
-					SOCKET_LIST[data.id].emit('recieveDamage', {weaponDamage : 5});
+				socket.on('attack', function(data){
+					SOCKET_LIST[data.id].emit('recieveDamage', {source : socket.id, DPS : data.DPS});
 				});
+				
 				socket.on('gotWasted', function(data){ disconnect(socket, data);});
 				sendToAll('addToChat', {words : '<i> '+ socket.id +' has connected</i>'});
 				console.log(socket.id, 'connected');
@@ -55,9 +56,10 @@ io.sockets.on('connection', function(socket){
 			
 			socket.emit('init', {
 				status : true,
-				position : {x : player.position.x,
-							y : player.position.y,
-							z : player.position.z}, 
+				rotation : [player.rotation.x,
+							player.rotation.y,
+							player.rotation.z,
+							player.rotation.w], 
 				id : socket.id,
 				fps : serverFPS
 			});
@@ -75,10 +77,12 @@ setInterval( update, 1000/serverFPS);
 
 var Player = function(id){
 	var self = {
-		position : {
-			x : Math.random()*5, 
-			y : 0.5, 
-			z : Math.random()*5
+		rotation : {
+			x : 0, 
+			y : 0, 
+			z : 0,
+			w : 1
+			
 		},
 		id : id
 	};
