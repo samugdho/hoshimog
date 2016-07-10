@@ -7,7 +7,7 @@ https://git.heroku.com/hidden-coast-14446.git
 
 var password = 'shrek';
 var adminPassword = 'donkey';
-var serverFPS = 25;
+var serverFPS = 40;
 var express = require('express');
 var app = express();
 var serv = require('http').Server(app);
@@ -47,6 +47,10 @@ io.sockets.on('connection', function(socket){
 				}); 
 				socket.on('attack', function(data){
 					SOCKET_LIST[data.id].emit('recieveDamage', {source : socket.id, DPS : data.DPS});
+				});
+				socket.on('spawnFireball', function(data){
+					data.socketId = socket.id;
+					sendToAll('spawnFireball',data);
 				});
 				
 				socket.on('gotWasted', function(data){ disconnect(socket, data);});

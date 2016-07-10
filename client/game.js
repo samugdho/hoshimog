@@ -3,7 +3,7 @@
 //phone stuff--later
 //wasted
 
-
+Hoshi = {};
 game = {};
 game.start = function(){
 	
@@ -278,6 +278,8 @@ function init(){
 					chatText.lastChild.scrollIntoView();
 			});
 			
+			socket.on('spawnFireball', handleFireballSpawn);
+			
 			isUpdate = true;
 			isFocus = true;
 			
@@ -295,6 +297,22 @@ function init(){
 }
 
 //web
+
+function handleFireballSpawn(data){
+	if (!Hoshi.projectiles[data.id]){
+		var f = Hoshi.Fireball(scene, data.socketId, {
+			position : new THREE.Vector3().fromArray(data.position), 
+			direction : new THREE.Vector3().fromArray(data.direction) , 
+			speed : data.speed, 
+			life : data.life,
+			id : data.id,
+			checkCollision : false
+		});
+	}
+	
+	
+}
+
 function clearChat(option){
 	var myNode = document.getElementById("chat-text");
 	while (myNode.lastChild && myNode.lastChild.id != '') {
@@ -404,19 +422,14 @@ function wasted(){
 	
 }
 
-function updateDamage(){
-	if(DPS > 0){
-		playerStats.hp.now = clamp(playerStats.hp.now - DPS/60 , 0.001, playerStats.hp.max);
-		HUD.healthBar.scale.x = playerStats.hp.now/playerStats.hp.max;
-		if (playerStats.hp.now < 0.002){
-			wasted();
-		}
-	}
-	
-}
+
 
 function recieveDamage(data){
-	DPS += data.DPS;
+	playerStats.hp.now = clamp(playerStats.hp.now - data.DPS , 0.001, playerStats.hp.max);
+	HUD.healthBar.scale.x = playerStats.hp.now/playerStats.hp.max;
+	if (playerStats.hp.now < 0.002){
+		wasted();
+	}
 	
 	
 }
@@ -454,6 +467,34 @@ function transition(now, after, options){
 
 
 //makers
+
+function shoot(){
+	var v = isMouseLock ? new THREE.Vector2(0,0) : new THREE.Vector2(0,mouse.y);
+	caster.setFromCamera(v , camera); 
+	var collisions = caster.intersectObjects(getArray(PLAYERS_LIST));
+	if (collisions.length > 0 ){
+		var position = player.localToWorld(new THREE.Vector3(0,0,-1)),
+			difference = collisions[0].point.sub(position),
+			distance = difference.length();
+			direction = difference.normalize(),
+			speed = .5;
+			life = distance/(speed*60)*1000 + 100 ;
+		//console.log(distance, speed, direction.clone().multiplyScalar(speed).length() );
+		var f = Hoshi.Fireball(scene, userId, {position : position, direction : direction , speed : speed, life : life});
+		socket.emit('spawnFireball', {
+			position : position.toArray(),
+			direction : direction.toArray(),
+			speed : 0.5,
+			id : f.id,
+			life : life
+		});
+	}
+	
+	
+	
+}
+
+
 function createPlayer(p){
 	var boxGeom	= new THREE.BoxGeometry( 1,1,1 );
 	var boxMat = new THREE.MeshLambertMaterial( { color: p.hex || randomColor({ hue : 'random',  luminosity : 'bright'}) } );
@@ -554,7 +595,7 @@ function lockmousemovehandle(e){
 			  0;
 	lockLook();
 	
-	mouseMoveInAttack();
+	//mouseMoveInAttack();
 	
 	
 }
@@ -597,7 +638,7 @@ function mousemovehandle(e){
 	mouse.x = (e.clientX / width) * 2 -1;
     mouse.y = -(e.clientY / height) * 2 + 1;
 	
-	mouseMoveInAttack();
+	//mouseMoveInAttack();
 
 }
 
@@ -664,8 +705,10 @@ function windowresizehandle(){
 	
 }	
 function mousedownhandle(e){
+	shoot();
 	mouse.isDown = true;
-	if (isFocus){
+	
+	/* if (isFocus){
 		//laser.object.lookAt()
 		var v = isMouseLock ? new THREE.Vector2(0,0) : new THREE.Vector2(0,mouse.y);
 		caster.setFromCamera(v , camera); 
@@ -683,11 +726,11 @@ function mousedownhandle(e){
 			//lookAt_byParent(laser.object, player, collisions[0].point);
 		}
 		
-	}
+	} */
 }
 function mouseuphandle(e){
 	mouse.isDown = true;
-	if (isFocus){
+	/* if (isFocus){
 		laser.beam.visible = false;
 		if (attackTarget){
 			socket.emit('attack', {id : attackTarget, DPS : -10});
@@ -695,13 +738,14 @@ function mouseuphandle(e){
 		}
 		
 		
-	}
+	} */
 }
 	//obj event
 
 
 
 function update() {
+
 	if (isFocus){
 		playerMove(0.001);
 		
@@ -717,7 +761,12 @@ function update() {
 		HUD.pointNorth();
 		
 	}
-	updateDamage();
+	Hoshi.updateProjectiles({
+		scene : scene,
+		PLAYERS_LIST : getArray(PLAYERS_LIST),
+		caster : caster,
+		socket : socket
+	});
 	//console.log(playerRot.quaternion);
 	//jumper(keyState[keys.space]);
 	//console.log(playerRot.quaternion);
