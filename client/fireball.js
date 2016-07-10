@@ -46,20 +46,28 @@ Hoshi.updateProjectiles = function(vars){
 		self.mesh.position.add(self.speed);
 		
 		vars.caster.set(self.mesh.position, self.direction)
-		var collisions = vars.caster.intersectObjects(vars.PLAYERS_LIST);
+		var collisions = vars.caster.intersectObjects(vars.OBSTACLE_LIST);
 		if (collisions.length > 0 && collisions[0].distance < self.radius){
-			clearTimeout(self.timeout);
-			vars.scene.remove(self.mesh);
-			delete Hoshi.projectiles[self.id];
+			Hoshi.deleteProjectile(self.timeout, vars.scene, self.mesh, self.id)
+		}
+		
+		var collisions = vars.caster.intersectObjects(vars.PLAYERS_LIST);
+		
+		if (collisions.length > 0 && collisions[0].distance < self.radius){
+			Hoshi.deleteProjectile(self.timeout, vars.scene, self.mesh, self.id)
 			if (self.checkCollision){
 				console.log('hit');
 				vars.socket.emit('attack', {
 					id : collisions[0].object.socketId, 
 					DPS : self.damage
 				});
-			}
-			
+			}	
 		}
-		
 	}
+}
+
+Hoshi.deleteProjectile = function(timeout, scene, mesh, id){
+	clearTimeout(timeout);
+	scene.remove(mesh);
+	delete Hoshi.projectiles[id];
 }

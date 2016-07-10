@@ -44,6 +44,9 @@ body {
 	
 }
 
+#instructions {
+	color : lightGray;
+}
 
 #chat-input {
 	width : 500px;

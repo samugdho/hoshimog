@@ -7,7 +7,7 @@ Hoshi = {};
 game = {};
 game.start = function(){
 	
-var stats, scene, renderer, caster, camera, mouse, canvas, socket, userId, FPS = 60, gravity = 0.1, HUD = {}, world = { globe : null, radius : 500},playerRot,
+var stats, scene, renderer, caster, camera, mouse, canvas, socket, userId, FPS = 60, gravity = 0.1, HUD = {}, world = { globe : null, radius : 500},playerRot, nSphere,
 	serverFPS, player, chatText, chatInput, hex, controls, laser = {}, relMouse, isMouseLock = false, phoneControls, DPS, attackTarget,
 	box, camdist, clientUpdate, jump, testLight, sideLights, isPhoneControl = false,
 	buttons = [], PLAYERS_LIST = {}, floor, playerStats = {}
@@ -112,9 +112,11 @@ function init(){
 	HUD.setPosition(HUD.healthBar, 0.5, 0.05);
 	HUD.scene.add(HUD.healthBar);
 	HUD.northBar = new THREE.Object3D();
+	var northTex = new THREE.TextureLoader().load( "client/northTex.png" );
+	
 	HUD.northBlock = new THREE.Mesh(
-		new THREE.BoxGeometry(10,100,10),
-		new THREE.MeshLambertMaterial({color : 0xee0000, emissive: 0xee0000})
+		new THREE.BoxGeometry(50,50,10),
+		new THREE.MeshBasicMaterial({map : northTex, transparent : true})
 	);
 	HUD.northBlock.position.z -= 5;
 	HUD.scene.add(HUD.northBlock);
@@ -176,7 +178,7 @@ function init(){
 		//batch creation
 	
 		//single creation
-	var nSphere = new THREE.Mesh(
+	nSphere = new THREE.Mesh(
 		new THREE.BoxGeometry(15,10005,15),
 		new THREE.MeshLambertMaterial({color : 0x770000, emissive : 0x777777, emissiveIntensity : 0.5, transparent : true, opacity : 1})
 	);
@@ -361,7 +363,7 @@ HUD.pointNorth = function(){
 		npwp = player.worldToLocal( np.add( player.getWorldPosition() ) ) ;
 		npwp.y = HUD.top - 150;
 		npwp.x *= -HUD.left/5;
-		npwp.z -= 5;
+		npwp.z -= 6.0;
 		HUD.northBlock.position.copy( npwp ) ;
 
 }
@@ -472,24 +474,35 @@ function shoot(){
 	var v = isMouseLock ? new THREE.Vector2(0,0) : new THREE.Vector2(0,mouse.y);
 	caster.setFromCamera(v , camera); 
 	var collisions = caster.intersectObjects(getArray(PLAYERS_LIST));
+	//console.log(camera.rotation);
+	var position = player.localToWorld(new THREE.Vector3(0,0,-1)),
+		difference,
+		speed = .5,
+		life = 3000;
 	if (collisions.length > 0 ){
-		var position = player.localToWorld(new THREE.Vector3(0,0,-1)),
-			difference = collisions[0].point.sub(position),
-			distance = difference.length();
-			direction = difference.normalize(),
-			speed = .5;
-			life = distance/(speed*60)*1000 + 100 ;
-		//console.log(distance, speed, direction.clone().multiplyScalar(speed).length() );
-		var f = Hoshi.Fireball(scene, userId, {position : position, direction : direction , speed : speed, life : life});
-		socket.emit('spawnFireball', {
-			position : position.toArray(),
-			direction : direction.toArray(),
-			speed : 0.5,
-			id : f.id,
-			life : life
-		});
+		difference = collisions[0].point.sub(position);
+	}else{
+		collisions = caster.intersectObjects([world.globe, nSphere]);
+		if (collisions.length > 0 ){
+			difference = collisions[0].point.sub(position);
+		}else{
+			difference = camera.localToWorld(new THREE.Vector3(0,v.y*50,-speed * 60 * life / 1000)).sub(position);
+		}
 	}
 	
+		
+	var direction = difference.normalize();
+		
+	//console.log(distance, speed, direction.clone().multiplyScalar(speed).length() );
+	var f = Hoshi.Fireball(scene, userId, {position : position, direction : direction , speed : speed, life : life});
+	socket.emit('spawnFireball', {
+		position : position.toArray(),
+		direction : direction.toArray(),
+		speed : 0.5,
+		id : f.id,
+		life : life
+	});
+
 	
 	
 }
@@ -765,7 +778,8 @@ function update() {
 		scene : scene,
 		PLAYERS_LIST : getArray(PLAYERS_LIST),
 		caster : caster,
-		socket : socket
+		socket : socket,
+		OBSTACLE_LIST :[world.globe, nSphere]
 	});
 	//console.log(playerRot.quaternion);
 	//jumper(keyState[keys.space]);
